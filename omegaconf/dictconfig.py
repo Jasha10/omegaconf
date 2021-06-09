@@ -732,12 +732,8 @@ class DictConfig(BaseContainer, MutableMapping[Any, Any]):
             except InterpolationResolutionError as e:
                 self._format_and_raise(key=k, value=None, cause=e)
             if node._is_missing():
-                self._format_and_raise(
-                    key=k,
-                    value=None,
-                    cause=MissingMandatoryValue(
-                        "Structured config of type `$OBJECT_TYPE` has missing mandatory value: $KEY"
-                    ),
+                raise MissingMandatoryValue(
+                    f"Structured config of type `{object_type.__name__}` has missing mandatory value: {k}"
                 )
             if isinstance(node, Container):
                 v = OmegaConf.to_object(node)
