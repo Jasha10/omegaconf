@@ -550,13 +550,17 @@ class OmegaConf:
                 f"Input cfg is not an OmegaConf config object ({type_str(type(cfg))})"
             )
 
-        return BaseContainer._to_content(
-            cfg,
-            resolve=resolve,
-            throw_on_missing=throw_on_missing,
-            enum_to_str=enum_to_str,
-            structured_config_mode=structured_config_mode,
-        )
+        try:
+            return BaseContainer._to_content(
+                cfg,
+                resolve=resolve,
+                throw_on_missing=throw_on_missing,
+                enum_to_str=enum_to_str,
+                structured_config_mode=structured_config_mode,
+            )
+        except OmegaConfBaseException as e:
+            format_and_raise(node=cfg, key=None, value=None, cause=e, msg=str(e))
+            assert False
 
     @staticmethod
     def to_object(cfg: Any) -> Union[Dict[DictKeyType, Any], List[Any], None, str, Any]:
