@@ -25,6 +25,7 @@ from ._utils import (
     _is_none,
     _valid_dict_key_annotation_type,
     format_and_raise,
+    get_dict_key_value_types,
     get_structured_config_data,
     get_structured_config_field_names,
     get_type_of,
@@ -73,6 +74,10 @@ class DictConfig(BaseContainer, MutableMapping[Any, Any]):
             if isinstance(content, DictConfig):
                 if flags is None:
                     flags = content._metadata.flags
+            if ref_type is not Any:
+                _ref_key_type, _ref_element_type = get_dict_key_value_types(ref_type)
+                assert key_type == _ref_key_type
+                assert element_type == _ref_element_type
             super().__init__(
                 parent=parent,
                 metadata=ContainerMetadata(

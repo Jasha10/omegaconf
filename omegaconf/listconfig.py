@@ -20,6 +20,7 @@ from ._utils import (
     _is_none,
     _is_optional,
     format_and_raise,
+    get_list_element_type,
     get_value_kind,
     is_int,
     is_primitive_list,
@@ -58,6 +59,9 @@ class ListConfig(BaseContainer, MutableSequence[Any]):
             if isinstance(content, ListConfig):
                 if flags is None:
                     flags = content._metadata.flags
+            if ref_type is not Any:
+                _ref_element_type = get_list_element_type(ref_type)
+                assert element_type == _ref_element_type
             super().__init__(
                 parent=parent,
                 metadata=ContainerMetadata(
