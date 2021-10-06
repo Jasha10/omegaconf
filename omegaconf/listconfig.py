@@ -12,6 +12,7 @@ from typing import (
     Tuple,
     Type,
     Union,
+    overload,
 )
 
 from ._utils import (
@@ -349,6 +350,28 @@ class ListConfig(BaseContainer, MutableSequence[Any]):
             if item == x:
                 c = c + 1
         return c
+
+    @overload
+    def _get_node(
+        self,
+        key: int,
+        validate_access: bool = True,
+        validate_key: bool = True,
+        throw_on_missing_value: bool = False,
+        throw_on_missing_key: bool = False,
+    ) -> Optional[Node]:
+        ...
+
+    @overload
+    def _get_node(
+        self,
+        key: slice,
+        validate_access: bool = True,
+        validate_key: bool = True,
+        throw_on_missing_value: bool = False,
+        throw_on_missing_key: bool = False,
+    ) -> List[Optional[Node]]:
+        ...
 
     def _get_node(
         self,
