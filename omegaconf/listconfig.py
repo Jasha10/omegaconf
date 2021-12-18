@@ -257,7 +257,6 @@ class ListConfig(BaseContainer, MutableSequence[Any]):
         for i in range(len(self)):
             node = self._get_node(i)
             if node is not None:
-                assert isinstance(node, Node)
                 node._metadata.key = i
 
     def insert(self, index: int, item: Any) -> None:
