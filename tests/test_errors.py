@@ -711,28 +711,27 @@ params = [
     ),
     param(
         Expected(
-            create=lambda: DictConfig({"bar": BytesNode(b"abc123")}),
+            create=lambda: DictConfig({"bar": BytesNode(b"binary")}),
             op=lambda cfg: cfg.__setattr__("bar", 123.4),
             exception_type=ValidationError,
-            msg="Value '123.4' of type 'float' could not be converted to Bytes",
+            msg="Value '123.4' of type 'float' is not of type 'bytes'",
             key="bar",
             full_key="bar",
             child_node=lambda cfg: cfg._get_node("bar"),
         ),
-        id="typed_DictConfig:assign_with_invalid_value,bytes",
+        id="typed_DictConfig:assign_with_invalid_value,string_to_bytes",
     ),
     param(
         Expected(
             create=lambda: DictConfig({"bar": StringNode("abc123")}),
-            op=lambda cfg: cfg.__setattr__("bar", b"\xf0\xf1\xf2"),
+            op=lambda cfg: cfg.__setattr__("bar", b"binary"),
             exception_type=ValidationError,
-            msg=r"Value b'\xf0\xf1\xf2' of type 'bytes' could not be converted to String: "
-            + "'utf-8' codec can't decode byte 0xf0 in position 0: invalid continuation byte",
+            msg=r"Cannot convert 'bytes' to string: 'b'binary''",
             key="bar",
             full_key="bar",
             child_node=lambda cfg: cfg._get_node("bar"),
         ),
-        id="typed_DictConfig:assign_with_invalid_value,bytes",
+        id="typed_DictConfig:assign_with_invalid_value,bytes_to_string",
     ),
     param(
         Expected(

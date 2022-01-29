@@ -689,8 +689,6 @@ class BaseContainer(Container, ABC):
                 key = key.name
             elif isinstance(key, (int, float, bool)):
                 key = str(key)
-            elif isinstance(key, bytes):
-                key = key.decode()
 
             if issubclass(parent_type, ListConfig):
                 if full_key != "":
