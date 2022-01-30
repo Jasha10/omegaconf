@@ -50,12 +50,21 @@ class EnumConfigAssignments:
 
 
 class IntegersConfigAssignments:
-    legal = [("10", 10), ("-10", -10), 100, 0, 1, 1]
-    illegal = ["foo", 1.0, float("inf"), b"123", float("nan"), Color.BLUE]
+    legal = [("10", 10), ("-10", -10), 100, 0, 1]
+    illegal = ["foo", 1.0, float("inf"), b"123", float("nan"), Color.BLUE, True, False]
 
 
 class StringConfigAssignments:
-    legal = ["10", "-10", "foo", "", (Color.BLUE, "Color.BLUE")]
+    legal = [
+        "10",
+        "-10",
+        "foo",
+        "",
+        (10, "10"),
+        (Color.BLUE, "Color.BLUE"),
+        (10.1, "10.1"),
+        (True, "True"),
+    ]
     illegal = [b"binary"]
 
 
@@ -93,7 +102,7 @@ class BoolConfigAssignments:
         ("0", False),
         (0, False),
     ]
-    illegal = [100.0, b"binary", Color.BLUE]
+    illegal = ["foo", 100.0, b"binary", Color.BLUE]
 
 
 class AnyTypeConfigAssignments:
