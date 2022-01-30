@@ -324,6 +324,11 @@ def test_is_none_invalid_node() -> None:
             )
         ),
         (
+            lambda inter: BytesNode(
+                value=b"123" if inter is None else inter, is_optional=True
+            )
+        ),
+        (
             lambda inter: EnumNode(
                 enum_type=Color,
                 value=Color.RED if inter is None else inter,
@@ -353,6 +358,7 @@ def test_is_none_invalid_node() -> None:
         "IntegerNode",
         "FloatNode",
         "BooleanNode",
+        "BytesNode",
         "EnumNode",
         "ListConfig",
         "DictConfig",
@@ -380,6 +386,7 @@ def test_is_interpolation(fac: Any) -> Any:
         ({"foo": 10}, int),
         ({"foo": 10.0}, float),
         ({"foo": True}, bool),
+        ({"foo": b"123"}, bytes),
         ({"foo": "bar"}, str),
         ({"foo": None}, type(None)),
         ({"foo": ConcretePlugin()}, ConcretePlugin),
@@ -401,6 +408,7 @@ def test_get_type(cfg: Any, type_: Any) -> None:
         (10, int),
         (10.0, float),
         (True, bool),
+        (b"123", bytes),
         ("foo", str),
         (DictConfig(content={}), dict),
         (ListConfig(content=[]), list),

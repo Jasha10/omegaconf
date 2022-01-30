@@ -110,6 +110,7 @@ def test_valid_inputs(type_: type, input_: Any, output_: Any) -> None:
         (FloatNode, b"10.1"),
         (BytesNode, "abc"),
         (BytesNode, 23),
+        (BytesNode, Color.RED),
         (BytesNode, 3.14),
         (BytesNode, True),
         (BooleanNode, "Nope"),
@@ -121,6 +122,10 @@ def test_valid_inputs(type_: type, input_: Any, output_: Any) -> None:
         (IntegerNode, {"foo": "var"}),
         (IntegerNode, b"10"),
         (IntegerNode, DictConfig({"foo": "var"})),
+        (BytesNode, [1, 2]),
+        (BytesNode, ListConfig([1, 2])),
+        (BytesNode, {"foo": "var"}),
+        (BytesNode, DictConfig({"foo": "var"})),
         (BooleanNode, [1, 2]),
         (BooleanNode, ListConfig([1, 2])),
         (BooleanNode, {"foo": "var"}),
@@ -294,7 +299,7 @@ def test_accepts_mandatory_missing(
 
 @mark.parametrize(
     "type_",
-    [BooleanNode, EnumNode, FloatNode, IntegerNode, StringNode, AnyNode],
+    [BooleanNode, BytesNode, EnumNode, FloatNode, IntegerNode, StringNode, AnyNode],
 )
 @mark.parametrize(
     "values, success_map",
@@ -349,6 +354,15 @@ def test_accepts_mandatory_missing(
             },
             id="falsey-integers",
         ),
+        param(
+            # Binary data
+            (b"binary",),
+            {
+                "BytesNode": b"binary",
+                "AnyNode": copy.copy,
+            },
+            id="binary-data",
+        ),
     ],
 )
 def test_legal_assignment(
@@ -376,7 +390,7 @@ def test_legal_assignment(
         (IntegerNode(), "foo"),
         (BooleanNode(), "foo"),
         (FloatNode(), "foo"),
-        (BytesNode(), 123.456),
+        (BytesNode(), "foo"),
         (EnumNode(enum_type=Enum1), "foo"),
     ],
 )

@@ -51,8 +51,8 @@ The following class defines fields with all simple types:
     ...     pi: float = 3.1415
     ...     is_awesome: bool = True
     ...     height: Height = Height.SHORT
-    ...     random_seq: bytes = b'123'
     ...     description: str = "text"
+    ...     data: bytes = b"bin_data"
 
 You can create a config based on the SimpleTypes class itself or an instance of it.
 Those would be equivalent by default, but the Object variant allows you to set the values of specific
@@ -73,9 +73,9 @@ fields during construction.
     pi: 3.1415
     is_awesome: true
     height: TALL
-    random_seq: !!binary |
-      MTIz
     description: text
+    data: !!binary |
+      YmluX2RhdGE=
     <BLANKLINE>
 
 The resulting object is a regular OmegaConf ``DictConfig``, except that it will utilize the type information in the input class/object
@@ -222,8 +222,8 @@ supported by OmegaConf (``int``, ``float``. ``bool``, ``str``, ``bytes``, ``Enum
 
     >>> @dataclass
     ... class ListsExample:
-    ...     # Typed list can hold Any, int, float, bool, str, bytes and Enums as well
-    ...     # as arbitrary Structured configs
+    ...     # Typed list can hold Any, int, float, bool, str,
+    ...     # bytes and Enums as well as arbitrary Structured configs.
     ...     ints: List[int] = field(default_factory=lambda: [10, 20, 30])
     ...     bools: Tuple[bool, bool] = field(default_factory=lambda: (True, False))
     ...     users: List[User] = field(default_factory=lambda: [User(name="omry")])

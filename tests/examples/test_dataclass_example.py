@@ -26,7 +26,7 @@ class SimpleTypes:
     is_awesome: bool = True
     height: Height = Height.SHORT
     description: str = "text"
-    data: bytes = b"binary"
+    data: bytes = b"bin_data"
 
 
 def test_simple_types_class() -> None:
@@ -37,7 +37,7 @@ def test_simple_types_class() -> None:
     assert conf.is_awesome is True
     assert conf.height == Height.SHORT
     assert conf.description == "text"
-    assert conf.data == b"binary"
+    assert conf.data == b"bin_data"
 
 
 def test_static_typing() -> None:
@@ -59,7 +59,7 @@ def test_simple_types_obj() -> None:
     assert conf.is_awesome is True
     assert conf.height == Height.SHORT
     assert conf.description == "text"
-    assert conf.data == b"binary"
+    assert conf.data == b"bin_data"
 
 
 def test_conversions() -> None:
@@ -85,8 +85,8 @@ def test_conversions() -> None:
         # bytes are not automatically converted to strings
         conf.description = b"binary"  # type: ignore
 
-    assert conf.data == b"binary"
-    conf.data = b"def"  # ok, type matches
+    assert conf.data == b"bin_data"
+    conf.data = b"def"  # assignment ok, type matches
     with raises(ValidationError):
         # ValidationError: "abc" cannot be converted to bytes
         conf.data = "text"  # type: ignore
