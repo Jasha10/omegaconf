@@ -643,9 +643,11 @@ class DictConfig(BaseContainer, MutableMapping[Any, Any]):
     def _set_value(self, value: Any, flags: Optional[Dict[str, bool]] = None) -> None:
         try:
             previous_content = self.__dict__["_content"]
+            previous_metadata = self.__dict__["_metadata"]
             self._set_value_impl(value, flags)
         except Exception as e:
             self.__dict__["_content"] = previous_content
+            self.__dict__["_metadata"] = previous_metadata
             raise e
 
     def _set_value_impl(
