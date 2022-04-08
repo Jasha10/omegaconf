@@ -693,7 +693,7 @@ class DictConfig(BaseContainer, MutableMapping[Any, Any]):
                 self._metadata.object_type = dict
 
             else:  # pragma: no cover
-                msg = f"Unsupported value type: {value}"
+                msg = f"Unsupported value type: {value} ({type(value).__name__})"
                 raise ValidationError(msg)
 
     @staticmethod
