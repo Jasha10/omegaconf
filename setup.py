@@ -1,7 +1,10 @@
 # type: ignore
 """
 OmegaConf setup
-    Instructions:
+
+    Release Instructions:
+    # Update NEWS.md using `towncrier` (see hydra.cc/docs/next/development/documentation/)
+
     # Build:
     rm -rf dist/ omegaconf.egg-info/
     python -m build
