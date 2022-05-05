@@ -34,6 +34,16 @@ try:
 except ImportError:  # pragma: no cover
     attr = None  # type: ignore # pragma: no cover
 
+NoneType: Type[None] = type(None)
+
+BUILTIN_VALUE_TYPES: Tuple[Type[Any], ...] = (
+    int,
+    float,
+    bool,
+    str,
+    bytes,
+    NoneType,
+)
 
 # Regexprs to match key paths like: a.b, a[b], ..a[c].d, etc.
 # We begin by matching the head (in these examples: a, a, ..a).
@@ -187,12 +197,25 @@ def is_union_annotation(type_: Any) -> bool:
 
 def _resolve_optional(type_: Any) -> Tuple[bool, Any]:
     """Check whether `type_` is equivalent to `typing.Optional[T]` for some T."""
-    if getattr(type_, "__origin__", None) is Union:
+    if is_union_annotation(type_):
         args = type_.__args__
-        if len(args) == 2 and args[1] == type(None):  # noqa E721
-            return True, args[0]
+        if NoneType in args:
+            optional = True
+            args = tuple(a for a in args if a is not NoneType)
+        else:
+            optional = False
+        if len(args) == 1:
+            return optional, args[0]
+        elif len(args) >= 2:
+            return optional, Union[args]
+        else:
+            assert False
+
     if type_ is Any:
         return True, Any
+
+    if type_ in (None, NoneType):
+        return True, NoneType
 
     return False, type_
 
@@ -305,9 +328,9 @@ def get_attr_data(obj: Any, allow_objects: Optional[bool] = None) -> Dict[str, A
             value = attrib.default
             if value == attr.NOTHING:
                 value = MISSING
-        if is_union_annotation(type_):
+        if is_union_annotation(type_) and not is_supported_union_annotation(type_):
             e = ConfigValueError(
-                f"Union types are not supported:\n{name}: {type_str(type_)}"
+                f"Unions of containers are not supported:\n{name}: {type_str(type_)}"
             )
             format_and_raise(node=None, key=None, value=value, cause=e, msg=str(e))
 
@@ -365,9 +388,9 @@ def get_dataclass_data(
             else:
                 value = MISSING
 
-        if is_union_annotation(type_):
+        if is_union_annotation(type_) and not is_supported_union_annotation(type_):
             e = ConfigValueError(
-                f"Union types are not supported:\n{name}: {type_str(type_)}"
+                f"Unions of containers are not supported:\n{name}: {type_str(type_)}"
             )
             format_and_raise(node=None, key=None, value=value, cause=e, msg=str(e))
         try:
@@ -610,11 +633,13 @@ def is_primitive_dict(obj: Any) -> bool:
 
 def is_dict_annotation(type_: Any) -> bool:
     origin = getattr(type_, "__origin__", None)
+    # type_dict is a bit hard to detect.
+    # this support is tentative, if it eventually causes issues in other areas it may be dropped.
     if sys.version_info < (3, 7, 0):
-        return origin is Dict or type_ is Dict  # pragma: no cover
+        # pragma: no cover
+        typed_dict = hasattr(type_, "__base__") and type_.__base__ == Dict
+        return origin is Dict or type_ is Dict or typed_dict
     else:  # pragma: no cover
-        # type_dict is a bit hard to detect.
-        # this support is tentative, if it eventually causes issues in other areas it may be dropped.
         typed_dict = hasattr(type_, "__base__") and type_.__base__ == dict
         return origin is dict or typed_dict
 
@@ -633,6 +658,14 @@ def is_tuple_annotation(type_: Any) -> bool:
         return origin is Tuple or type_ is Tuple  # pragma: no cover
     else:
         return origin is tuple  # pragma: no cover
+
+
+def is_supported_union_annotation(obj: Any) -> bool:
+    """Currently only primitive types are supported in Unions, e.g. Union[int, str]"""
+    if not is_union_annotation(obj):
+        return False
+    args = obj.__args__
+    return all(is_primitive_type_annotation(arg) for arg in args)
 
 
 def is_dict_subclass(type_: Any) -> bool:
@@ -686,6 +719,7 @@ def is_valid_value_annotation(type_: Any) -> bool:
         or is_primitive_type_annotation(type_)
         or is_structured_config(type_)
         or is_container_annotation(type_)
+        or is_supported_union_annotation(type_)
     )
 
 
@@ -695,23 +729,13 @@ def _valid_dict_key_annotation_type(type_: Any) -> bool:
     return type_ is None or type_ is Any or issubclass(type_, DictKeyType.__args__)  # type: ignore
 
 
-BASE_TYPES = (
-    int,
-    float,
-    bool,
-    bytes,
-    str,
-    type(None),
-)
-
-
 def is_primitive_type_annotation(type_: Any) -> bool:
     type_ = get_type_of(type_)
-    return issubclass(type_, (Enum, pathlib.Path)) or type_ in BASE_TYPES
+    return issubclass(type_, (Enum, pathlib.Path)) or type_ in BUILTIN_VALUE_TYPES
 
 
 def _get_value(value: Any) -> Any:
-    from .base import Container
+    from .base import Container, UnionNode
     from .nodes import ValueNode
 
     if isinstance(value, ValueNode):
@@ -720,6 +744,12 @@ def _get_value(value: Any) -> Any:
         boxed = value._value()
         if boxed is None or _is_missing_literal(boxed) or _is_interpolation(boxed):
             return boxed
+    elif isinstance(value, UnionNode):
+        boxed = value._value()
+        if boxed is None or _is_missing_literal(boxed) or _is_interpolation(boxed):
+            return boxed
+        else:
+            return _get_value(boxed)  # pass through value of boxed node
 
     # return primitives and regular OmegaConf Containers as is
     return value
@@ -862,8 +892,8 @@ def format_and_raise(
 
 def type_str(t: Any, include_module_name: bool = False) -> str:
     is_optional, t = _resolve_optional(t)
-    if t is None:
-        return type(t).__name__
+    if t is NoneType:
+        return t.__name__
     if t is Any:
         return "Any"
     if t is ...:
@@ -971,7 +1001,7 @@ def split_key(key: str) -> List[str]:
 
     This is similar to `key.split(".")` but also works with the getitem syntax:
         "a.b"       -> ["a", "b"]
-        "a[b]"      -> ["a, "b"]
+        "a[b]"      -> ["a", "b"]
         ".a.b[c].d" -> ["", "a", "b", "c", "d"]
         "[a].b"     -> ["a", "b"]
     """

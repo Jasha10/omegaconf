@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from textwrap import dedent
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Optional, Type, Union
 
 from pytest import mark, param, raises
 
@@ -18,6 +18,7 @@ from omegaconf import (
     PathNode,
     ReadonlyConfigError,
     StringNode,
+    UnionNode,
     UnsupportedValueType,
     ValidationError,
 )
@@ -798,7 +799,7 @@ params = [
             create=lambda: None,
             op=lambda cfg: OmegaConf.structured(UnionError),
             exception_type=ValueError,
-            msg="Union types are not supported:\nx: Union[int, str]",
+            msg="Unions of containers are not supported:\nx: Union[int, List[str]]",
             num_lines=3,
         ),
         id="structured:create_with_union_error",
@@ -1636,10 +1637,19 @@ def test_parse_error_on_creation(create_func: Any, arg: Any) -> None:
     ],
 )
 def test_parent_type_error_on_creation(create_func: Any, obj: Any) -> None:
+    with raises(ConfigTypeError, match=re.escape("Parent type is not omegaconf.Box")):
+        create_func(obj, parent={"a"})  # bad parent
+
+
+def test_union_must_not_be_parent_of_union() -> None:
+    bad_parent = UnionNode(123, Union[int, str])
     with raises(
         ConfigTypeError, match=re.escape("Parent type is not omegaconf.Container")
     ):
-        create_func(obj, parent={"a"})  # bad parent
+        UnionNode(456, Union[int, str], parent=bad_parent)
+
+    good_parent = DictConfig({})
+    UnionNode(456, Union[int, str], parent=good_parent)  # ok
 
 
 def test_cycle_when_iterating_over_parents() -> None:

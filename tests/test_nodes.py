@@ -4,7 +4,7 @@ import re
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict, Tuple, Type
+from typing import Any, Dict, Tuple, Type, Union
 
 from pytest import mark, param, raises
 
@@ -21,9 +21,10 @@ from omegaconf import (
     OmegaConf,
     PathNode,
     StringNode,
+    UnionNode,
     ValueNode,
 )
-from omegaconf._utils import type_str
+from omegaconf._utils import BUILTIN_VALUE_TYPES, type_str
 from omegaconf.errors import (
     InterpolationToMissingValueError,
     UnsupportedValueType,
@@ -31,6 +32,10 @@ from omegaconf.errors import (
 )
 from omegaconf.nodes import InterpolationResultNode
 from tests import Color, Enum1, IllegalType, User
+
+
+def _call_union_node(content: Any) -> UnionNode:
+    return UnionNode(content=content, ref_type=Union[(Enum, *BUILTIN_VALUE_TYPES)])  # type: ignore
 
 
 # testing valid conversions
@@ -89,6 +94,15 @@ from tests import Color, Enum1, IllegalType, User
         # Path node
         (PathNode, "hello.txt", Path("hello.txt")),
         (PathNode, Path("hello.txt"), Path("hello.txt")),
+        # Union node
+        param(_call_union_node, "abc", "abc", id="union-str"),
+        param(_call_union_node, 10, 10, id="union-int"),
+        param(_call_union_node, 10.1, 10.1, id="union-float"),
+        param(_call_union_node, float("inf"), float("inf"), id="union-inf"),
+        param(_call_union_node, b"binary\xf0\xf1", b"binary\xf0\xf1", id="union-bytes"),
+        param(_call_union_node, True, True, id="union-bool"),
+        param(_call_union_node, None, None, id="union-none"),
+        param(_call_union_node, Color.RED, Color.RED, id="union-enum"),
     ],
 )
 def test_valid_inputs(type_: type, input_: Any, output_: Any) -> None:
@@ -98,6 +112,7 @@ def test_valid_inputs(type_: type, input_: Any, output_: Any) -> None:
     assert not (node != output_)
     assert not (node != node)
     assert str(node) == str(output_)
+    assert repr(node) == repr(output_)
 
 
 # testing invalid conversions
@@ -551,15 +566,26 @@ def test_deepcopy(obj: Any) -> None:
         (StringNode(), None, True),
         (StringNode(), 100, False),
         (StringNode("foo"), "foo", True),
+        (StringNode("???"), "???", True),
+        (StringNode(None), None, True),
+        (StringNode("abc"), None, False),
+        (StringNode("${interp}"), "${interp}", True),
+        (StringNode("${interp}"), "${different_interp}", False),
         (IntegerNode(), 1, False),
         (IntegerNode(1), 1, True),
         (IntegerNode(1), "foo", False),
+        (IntegerNode(1), "foo", False),
+        (IntegerNode("???"), "???", True),
+        (IntegerNode(None), None, True),
+        (IntegerNode("${interp}"), "${interp}", True),
+        (IntegerNode("${interp}"), "${different_interp}", False),
         (FloatNode(), 1, False),
         (FloatNode(), None, True),
         (FloatNode(1.0), None, False),
         (FloatNode(1.0), 1.0, True),
         (FloatNode(1), 1, True),
         (FloatNode(1.0), "foo", False),
+        (FloatNode("???"), "???", True),
         (BytesNode(), None, True),
         (BytesNode(), b"binary", False),
         (BytesNode(b"binary"), b"binary", True),
@@ -582,6 +608,10 @@ def test_deepcopy(obj: Any) -> None:
             True,
         ),
         (EnumNode(enum_type=Enum1, value=Enum1.BAR), Enum1.BAR, True),
+        (EnumNode(enum_type=Enum1, value="???"), "???", True),
+        (EnumNode(enum_type=Enum1, value=None), Enum1.BAR, False),
+        (EnumNode(enum_type=Enum1, value="${interp}"), "${interp}", True),
+        (EnumNode(enum_type=Enum1, value="${interp}"), "${different_interp}", False),
         (InterpolationResultNode("foo"), "foo", True),
         (InterpolationResultNode("${foo}"), "${foo}", True),
         (InterpolationResultNode("${foo"), "${foo", True),
@@ -594,6 +624,49 @@ def test_deepcopy(obj: Any) -> None:
         (InterpolationResultNode([0, None, True]), [0, None, True], True),
         (InterpolationResultNode("foo"), 100, False),
         (InterpolationResultNode(100), "foo", False),
+        (InterpolationResultNode("???"), "???", True),
+        (InterpolationResultNode(None), None, True),
+        (InterpolationResultNode(None), 100, False),
+        (UnionNode(100, Union[int, bool]), UnionNode(100, Union[int, bool]), True),
+        (UnionNode(100, Union[int, bool]), 100, True),
+        (UnionNode(100, Union[int, bool]), IntegerNode(100), True),
+        (UnionNode(100, Union[int, bool]), AnyNode(100), True),
+        (UnionNode("???", Union[int, bool]), UnionNode("???", Union[int, bool]), True),
+        (UnionNode("???", Union[int, bool]), "???", True),
+        (UnionNode("???", Union[int, bool]), IntegerNode("???"), True),
+        (UnionNode("???", Union[int, bool]), AnyNode("???"), True),
+        (UnionNode(None, Union[int, bool]), UnionNode(None, Union[int, bool]), True),
+        (UnionNode(None, Union[int, bool]), None, True),
+        (UnionNode(None, Union[int, bool]), IntegerNode(None), True),
+        (UnionNode(None, Union[int, bool]), AnyNode(None), True),
+        (
+            UnionNode("${interp}", Union[int, bool]),
+            UnionNode("${interp}", Union[int, bool]),
+            True,
+        ),
+        (UnionNode("${interp}", Union[int, bool]), "${interp}", True),
+        (UnionNode("${interp}", Union[int, bool]), IntegerNode("${interp}"), True),
+        (UnionNode("${interp}", Union[int, bool]), AnyNode("${interp}"), True),
+        (UnionNode(100, Union[int, bool]), UnionNode(999, Union[int, bool]), False),
+        (UnionNode(100, Union[int, bool]), 999, False),
+        (UnionNode(100, Union[int, bool]), IntegerNode(999), False),
+        (UnionNode(100, Union[int, bool]), AnyNode(999), False),
+        (UnionNode("???", Union[int, bool]), UnionNode(999, Union[int, bool]), False),
+        (UnionNode("???", Union[int, bool]), 999, False),
+        (UnionNode("???", Union[int, bool]), IntegerNode(999), False),
+        (UnionNode("???", Union[int, bool]), AnyNode(999), False),
+        (UnionNode(None, Union[int, bool]), UnionNode(999, Union[int, bool]), False),
+        (UnionNode(None, Union[int, bool]), 999, False),
+        (UnionNode(None, Union[int, bool]), IntegerNode(999), False),
+        (UnionNode(None, Union[int, bool]), AnyNode(999), False),
+        (
+            UnionNode("${interp}", Union[int, bool]),
+            UnionNode(999, Union[int, bool]),
+            False,
+        ),
+        (UnionNode("${interp}", Union[int, bool]), 999, False),
+        (UnionNode("${interp}", Union[int, bool]), IntegerNode(999), False),
+        (UnionNode("${interp}", Union[int, bool]), AnyNode(999), False),
     ],
 )
 def test_eq(node: ValueNode, value: Any, expected: Any) -> None:

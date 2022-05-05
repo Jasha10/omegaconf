@@ -7,17 +7,21 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import attr
 from pytest import mark, param, raises
 
-from omegaconf import DictConfig, ListConfig, Node, OmegaConf, _utils
+from omegaconf import DictConfig, ListConfig, Node, OmegaConf, UnionNode, _utils
 from omegaconf._utils import (
     Marker,
+    NoneType,
     _ensure_container,
     _get_value,
     _is_optional,
+    _resolve_optional,
     get_dict_key_value_types,
     get_list_element_type,
     is_dict_annotation,
     is_list_annotation,
+    is_supported_union_annotation,
     is_tuple_annotation,
+    is_union_annotation,
     nullcontext,
     split_key,
 )
@@ -33,7 +37,16 @@ from omegaconf.nodes import (
     StringNode,
 )
 from omegaconf.omegaconf import _node_wrap
-from tests import Color, ConcretePlugin, Dataframe, IllegalType, Plugin, User
+from tests import (
+    Color,
+    ConcretePlugin,
+    Dataframe,
+    IllegalType,
+    Plugin,
+    Str2Int,
+    UnionAnnotations,
+    User,
+)
 
 
 class DummyEnum(Enum):
@@ -305,9 +318,21 @@ class _TestUserClass:
         # Nesting structured configs in contain
         (_TestAttrsClass, True),
         (_TestDataclass, True),
+        # container annotations
+        (List[int], True),
+        (Dict[str, int], True),
+        # optional and union
+        (Optional[int], True),
+        (Union[int, str], True),
+        (Union[int, List[str]], False),
+        (Union[int, Dict[int, str]], False),
+        (Union[int, _TestEnum], True),
+        (Union[int, _TestAttrsClass], False),
+        (Union[int, _TestDataclass], False),
+        (Union[int, _TestUserClass], False),
     ],
 )
-def test_valid_value_annotation_type(type_: type, expected: bool) -> None:
+def test_is_valid_value_annotation(type_: type, expected: bool) -> None:
     from omegaconf._utils import is_valid_value_annotation
 
     assert is_valid_value_annotation(type_) == expected
@@ -525,7 +550,7 @@ def test_get_key_value_types(
         (bytes, True),
         (str, True),
         (Path, True),
-        (type(None), True),
+        (NoneType, True),
         (Color, True),
         (list, False),
         (ListConfig, False),
@@ -533,7 +558,7 @@ def test_get_key_value_types(
         (DictConfig, False),
     ],
 )
-def test_is_primitive_type(type_: Any, is_primitive: bool) -> None:
+def test_is_primitive_type_annotation(type_: Any, is_primitive: bool) -> None:
     assert _utils.is_primitive_type_annotation(type_) == is_primitive
 
 
@@ -567,18 +592,28 @@ def test_is_primitive_type(type_: Any, is_primitive: bool) -> None:
         (Dict[str, Plugin], True, "Dict[str, tests.Plugin]"),
         (Dict[str, List[Plugin]], False, "Dict[str, List[Plugin]]"),
         (Dict[str, List[Plugin]], True, "Dict[str, List[tests.Plugin]]"),
+        (dict, False, "dict"),
+        (dict, True, "dict"),
         (List[str], False, "List[str]"),
         (List[str], True, "List[str]"),
         (List[Color], False, "List[Color]"),
         (List[Color], True, "List[tests.Color]"),
         (List[Dict[str, Color]], False, "List[Dict[str, Color]]"),
         (List[Dict[str, Color]], True, "List[Dict[str, tests.Color]]"),
+        (list, False, "list"),
+        (list, True, "list"),
         (Tuple[str], False, "Tuple[str]"),
         (Tuple[str], True, "Tuple[str]"),
         (Tuple[str, int], False, "Tuple[str, int]"),
         (Tuple[str, int], True, "Tuple[str, int]"),
         (Tuple[float, ...], False, "Tuple[float, ...]"),
         (Tuple[float, ...], True, "Tuple[float, ...]"),
+        (tuple, False, "tuple"),
+        (tuple, True, "tuple"),
+        (Union[str, int, Color], False, "Union[str, int, Color]"),
+        (Union[str, int, Color], True, "Union[str, int, tests.Color]"),
+        (Union[int], False, "int"),
+        (Union[int], True, "int"),
     ],
 )
 def test_type_str(
@@ -599,20 +634,16 @@ def test_type_str_ellipsis() -> None:
     assert _utils.type_str(...) == "..."
 
 
-def test_type_str_none() -> None:
-    assert _utils.type_str(None) == "NoneType"
-
-
 @mark.parametrize(
     "type_, expected",
     [
-        (Optional[int], "Optional[int]"),
-        (Union[str, int, Color], "Union[str, int, Color]"),
-        (Optional[Union[int]], "Optional[int]"),
-        (Optional[Union[int, str]], "Union[int, str, NoneType]"),
+        param(None, "NoneType", id="none"),
+        param(NoneType, "NoneType", id="nonetype"),
+        (Union[float, bool, None], "Optional[Union[float, bool]]"),
+        (Union[float, bool, NoneType], "Optional[Union[float, bool]]"),
     ],
 )
-def test_type_str_union(type_: Any, expected: str) -> None:
+def test_type_str_nonetype(type_: Any, expected: str) -> None:
     assert _utils.type_str(type_) == expected
 
 
@@ -628,9 +659,16 @@ def test_type_str_union(type_: Any, expected: str) -> None:
         (Dict[Plugin, Plugin], True),
         (Dict[IllegalType, int], True),
         (Dict, True),
+        (Str2Int, True),
+        (Str2Int(), False),
+        (User, False),
+        (User(), False),
         (List, False),
         (dict, False),
         (DictConfig, False),
+        (Any, False),
+        (None, False),
+        (NoneType, False),
     ],
 )
 def test_is_dict_annotation(type_: Any, expected: Any) -> Any:
@@ -672,14 +710,58 @@ def test_is_list_annotation(type_: Any, expected: Any) -> Any:
         (Dict, False),
         (List, False),
         (Tuple, True),
-        (Tuple, True),
         (list, False),
         (dict, False),
         (tuple, False),
+        (Any, False),
+        (int, False),
+        (User, False),
+        (None, False),
+        (NoneType, False),
     ],
 )
 def test_is_tuple_annotation(type_: Any, expected: Any) -> Any:
     assert is_tuple_annotation(type_=type_) == expected
+
+
+@mark.parametrize(
+    "input_, expected",
+    [
+        (Union[int, str], True),
+        (Union[int, List[str]], True),
+        (Optional[Union[int, str]], True),
+        (Union[int, None], True),
+        (Optional[int], True),
+        (Any, False),
+        (int, False),
+        (User, False),
+        (None, False),
+        (NoneType, False),
+    ],
+)
+def test_is_union_annotation(input_: Any, expected: bool) -> None:
+    assert is_union_annotation(input_) == expected
+
+
+@mark.parametrize(
+    "input_, expected",
+    [
+        (Union[int, str], True),
+        (Union[int, List[str]], False),
+        (Union[int, Dict[str, int]], False),
+        (Union[int, User], False),
+        (Optional[Union[int, str]], True),
+        (Union[int, None], True),
+        (Optional[int], True),
+        (Any, False),
+        (int, False),
+        (User, False),
+        (None, False),
+        (NoneType, False),
+    ],
+)
+def test_is_supported_union_annotation(input_: Any, expected: bool) -> None:
+    assert is_supported_union_annotation(input_) == expected
 
 
 @mark.parametrize(
@@ -792,6 +874,15 @@ def test_get_ref_type(obj: Any, expected: Any) -> None:
         param(User, "name", str, id="User.name"),
         param(User, "age", int, id="User.age"),
         param({"user": User}, "user", Any, id="user"),
+        param(
+            OmegaConf.structured(UnionAnnotations), "ubf", Union[bool, float], id="ubf"
+        ),
+        param(
+            OmegaConf.structured(UnionAnnotations),
+            "oubf",
+            Optional[Union[bool, float]],
+            id="oubf",
+        ),
     ],
 )
 def test_get_node_ref_type(obj: Any, key: str, expected: Any) -> None:
@@ -817,7 +908,8 @@ def test_get_value_basic(value: Any) -> None:
     val_node = _node_wrap(
         value=value, ref_type=Any, parent=None, is_optional=True, key=None
     )
-    assert _get_value(val_node) == value
+    result = _get_value(val_node)
+    assert result == value
 
 
 @mark.parametrize(
@@ -828,6 +920,36 @@ def test_get_value_container(content: Any) -> None:
     cfg = DictConfig({})
     cfg._set_value(content)
     assert _get_value(cfg) == content
+
+
+@mark.parametrize(
+    "node, expected",
+    [
+        param(AnyNode(123), 123, id="anynode"),
+        param(IntegerNode(123), 123, id="integernode"),
+        param(ListConfig([1, 2, 3]), ListConfig([1, 2, 3]), id="listconfig"),
+        param(123, 123, id="int"),
+        param("${a}", "${a}", id="raw-interp"),
+        param(DictConfig("${a}"), "${a}", id="dict-interp"),
+        param(AnyNode("${a}"), "${a}", id="any-interp"),
+        param(IntegerNode("${a}"), "${a}", id="int-interp"),
+        param(UnionNode("${a}", Union[int, str]), "${a}", id="union-interp"),
+        param(DictConfig("???"), "???", id="dict-missing"),
+        param(AnyNode("???"), "???", id="any-missing"),
+        param(IntegerNode("???"), "???", id="int-missing"),
+        param(UnionNode("???", Union[int, str]), "???", id="union-missing"),
+        param(DictConfig(None), None, id="dict-none"),
+        param(AnyNode(None), None, id="any-none"),
+        param(IntegerNode(None), None, id="int-none"),
+        param(UnionNode(None, Union[int, str]), None, id="union-none"),
+        param(DictConfig({"foo": "bar"}), DictConfig({"foo": "bar"}), id="dictconfig"),
+        param(UnionNode(123, Union[int, str]), 123, id="union[int]"),
+    ],
+)
+def test_get_value_of_node_subclass(node: Node, expected: Any) -> None:
+    result = _get_value(node)
+    assert result == expected
+    assert type(result) == type(expected)
 
 
 def test_ensure_container_raises_ValueError() -> None:
@@ -935,6 +1057,13 @@ def test_nullcontext() -> None:
                 is_optional=is_optional,
             )
         ),
+        (
+            lambda is_optional, missing: UnionNode(
+                ref_type=Union[int, str],
+                content=123 if not missing else "???",
+                is_optional=is_optional,
+            )
+        ),
     ],
 )
 def test_is_optional(fac: Any, is_optional: bool) -> None:
@@ -983,3 +1112,113 @@ def test_get_dict_key_value_types(
 )
 def test_get_list_element_type(ref_type: Any, expected_element_type: Any) -> None:
     assert get_list_element_type(ref_type) == expected_element_type
+
+
+@mark.parametrize(
+    "type_, expected_optional, expected_type",
+    [
+        param(int, False, int, id="int"),
+        param(Any, True, Any, id="any"),
+        param(Color, False, Color, id="color"),
+        param(Optional[str], True, str, id="str"),
+        param(Optional[Any], True, Any, id="o[any]"),
+        param(Union[int, str], False, Union[int, str], id="int-str"),
+        param(Union[str, int], False, Union[str, int], id="str-int"),
+        param(Dict[str, int], False, Dict[str, int], id="dict[str,int]"),
+        param(Dict, False, Dict, id="dict"),
+        param(Dict[Any, Any], False, Dict[Any, Any], id="dict[any,any]"),
+        param(Optional[Dict[str, int]], True, Dict[str, int], id="o[dict[str,int]]"),
+        param(Optional[Dict], True, Dict, id="dict"),
+        param(
+            Dict[str, Optional[int]],
+            False,
+            Dict[str, Optional[int]],
+            id="dict[str,o[int]]",
+        ),
+        param(Union[int, None], True, int, id="int-none"),
+        param(Union[int, NoneType], True, int, id="int-nonetype"),
+        param(Union[Optional[int], None], True, int, id="o[int]-none"),
+        param(Union[Any, None], True, Any, id="any-none"),
+        param(Union[None, int], True, int, id="none-int"),
+        param(Union[None, None], True, NoneType, id="none-none"),
+        param(Union[None, NoneType], True, NoneType, id="none-nonetype"),
+        param(Union[None, Optional[None]], True, NoneType, id="none-o[none]"),
+        param(None, True, NoneType, id="none"),
+        param(NoneType, True, NoneType, id="nonetype"),
+        param(Union[int, int], False, int, id="int-int"),
+        param(Union[int, Optional[int]], True, int, id="int-o[int]"),
+        param(Union[int], False, int, id="u[int]"),
+        param(Union[Optional[int]], True, int, id="u[o[int]]"),
+        param(Optional[Union[int]], True, int, id="o[u[int]]"),
+        param(Union[int, Optional[str]], True, Union[int, str], id="int-o[str]"),
+        param(Optional[Optional[int]], True, int, id="o[o[int]]"),
+        param(Optional[Optional[Any]], True, Any, id="o[o[any]]"),
+        param(User, False, User, id="user"),
+        param(Optional[User], True, User, id="o[user]"),
+        param(Union[User, int], False, Union[User, int], id="user-int"),
+        param(Optional[Union[User, int]], True, Union[User, int], id="o[user-int]"),
+        param(Union[Optional[User], int], True, Union[User, int], id="o[user]-int"),
+        param(Union[User, Optional[int]], True, Union[User, int], id="user-o[int]"),
+        param(Optional[Union[int, str]], True, Union[int, str], id="o[u[int-str]]"),
+        param(Union[Optional[int], str], True, Union[int, str], id="u[o[int]-str]]"),
+        param(
+            Optional[Union[Optional[int], str]],
+            True,
+            Union[int, str],
+            id="o[u[o[int]-str]]]",
+        ),
+        param(
+            Union[Optional[int], Optional[str]],
+            True,
+            Union[int, str],
+            id="u[o[int]-o[str]]]",
+        ),
+        param(Union[int, str, None], True, Union[int, str], id="u[int-str-none]"),
+        param(Union[int, str, None], True, Union[int, str], id="u[int-str-nonetype]"),
+        param(
+            Union[User, Union[int, str]],
+            False,
+            Union[User, int, str],
+            id="user-[int-str]",
+        ),
+        param(
+            Union[User, NoneType, Union[int, str]],
+            True,
+            Union[User, int, str],
+            id="user-nonetype-[int-str]",
+        ),
+        param(
+            Union[User, None, Union[int, str]],
+            True,
+            Union[User, int, str],
+            id="user-none-[int-str]",
+        ),
+        param(
+            Union[User, None, Union[Optional[int], str]],
+            True,
+            Union[User, int, str],
+            id="user-none-[o[int]-str]",
+        ),
+        param(
+            Union[User, Union[Optional[int], str]],
+            True,
+            Union[User, int, str],
+            id="user-none-[o[int]-str]",
+        ),
+        param(
+            Union[float, bool, None], True, Union[float, bool], id="u[float-bool-none]"
+        ),
+        param(
+            Union[float, bool, NoneType],
+            True,
+            Union[float, bool],
+            id="u[float-bool-nonetype]",
+        ),
+    ],
+)
+def test_resolve_optional(
+    type_: Any, expected_optional: bool, expected_type: Any
+) -> None:
+    resolved_optional, resolved_type = _resolve_optional(type_)
+    assert resolved_optional == expected_optional
+    assert resolved_type == expected_type

@@ -48,11 +48,12 @@ from ._utils import (
     is_primitive_list,
     is_structured_config,
     is_tuple_annotation,
+    is_union_annotation,
     nullcontext,
     split_key,
     type_str,
 )
-from .base import Container, Node, SCMode
+from .base import Box, Container, Node, SCMode, UnionNode
 from .basecontainer import BaseContainer
 from .errors import (
     MissingMandatoryValue,
@@ -604,7 +605,7 @@ class OmegaConf:
     def is_missing(cfg: Any, key: DictKeyType) -> bool:
         assert isinstance(cfg, Container)
         try:
-            node = cfg._get_node(key)
+            node = cfg._get_child(key)
             if node is None:
                 return False
             assert isinstance(node, Node)
@@ -621,7 +622,7 @@ class OmegaConf:
         )
         if key is not None:
             assert isinstance(obj, Container)
-            obj = obj._get_node(key)
+            obj = obj._get_child(key)
         if isinstance(obj, Node):
             return obj._is_optional()
         else:
@@ -637,7 +638,7 @@ class OmegaConf:
 
         if key is not None:
             assert isinstance(obj, Container)
-            obj = obj._get_node(key)
+            obj = obj._get_child(key)
 
         return _is_none(obj, resolve=True, throw_on_resolution_failure=False)
 
@@ -645,7 +646,7 @@ class OmegaConf:
     def is_interpolation(node: Any, key: Optional[Union[int, str]] = None) -> bool:
         if key is not None:
             assert isinstance(node, Container)
-            target = node._get_node(key)
+            target = node._get_child(key)
         else:
             target = node
         if target is not None:
@@ -674,7 +675,7 @@ class OmegaConf:
     @staticmethod
     def get_type(obj: Any, key: Optional[str] = None) -> Optional[Type[Any]]:
         if key is not None:
-            c = obj._get_node(key)
+            c = obj._get_child(key)
         else:
             c = obj
         return OmegaConf._get_obj_type(c)
@@ -1017,7 +1018,7 @@ def open_dict(config: Container) -> Generator[Container, None, None]:
 
 
 def _node_wrap(
-    parent: Optional[BaseContainer],
+    parent: Optional[Box],
     is_optional: bool,
     value: Any,
     key: Any,
@@ -1057,6 +1058,14 @@ def _node_wrap(
             parent=parent,
             key_type=key_type,
             element_type=element_type,
+        )
+    elif is_union_annotation(ref_type):
+        node = UnionNode(
+            content=value,
+            ref_type=ref_type,
+            is_optional=is_optional,
+            key=key,
+            parent=parent,
         )
     elif ref_type == Any or ref_type is None:
         node = AnyNode(value=value, key=key, parent=parent)
@@ -1124,7 +1133,7 @@ def _select_one(
 
     if isinstance(c, DictConfig):
         assert isinstance(ret_key, str)
-        val = c._get_node(ret_key, validate_access=False)
+        val = c._get_child(ret_key, validate_access=False)
     elif isinstance(c, ListConfig):
         assert isinstance(ret_key, str)
         if not is_int(ret_key):
@@ -1139,7 +1148,7 @@ def _select_one(
             if ret_key < 0 or ret_key + 1 > len(c):
                 val = None
             else:
-                val = c._get_node(ret_key)
+                val = c._get_child(ret_key)
     else:
         assert False
 
