@@ -96,6 +96,7 @@ class ListConfig(BaseContainer, MutableSequence[Any]):
             raise ReadonlyConfigError("ListConfig is read-only")
 
         if 0 <= key < self.__len__():
+            # TODO: this should be _get_node. Make a test case to prove it!
             target = self._get_node(key)
             if target is not None:
                 assert isinstance(target, Node)
@@ -297,6 +298,7 @@ class ListConfig(BaseContainer, MutableSequence[Any]):
 
     def _update_keys(self) -> None:
         for i in range(len(self)):
+            # TODO: this should be _get_node. Make a test case to prove it!
             node = self._get_node(i)
             if node is not None:
                 assert isinstance(node, Node)

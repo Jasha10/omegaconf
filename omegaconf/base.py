@@ -439,6 +439,7 @@ class Container(Box):
         throw_on_resolution_failure: bool,
         memo: Optional[Set[int]] = None,
     ) -> Tuple[Optional["Container"], Optional[str], Optional[Node]]:
+        # TODO: do we need to generalize this from `Container` to `Box`?
         """
         Select a value using dot separated key sequence
         """
@@ -513,6 +514,7 @@ class Container(Box):
     def _resolve_interpolation_from_parse_tree(
         self,
         parent: Optional["Container"],
+        # TODO: do we need to generalize this from `Container` to `Box`?
         value: "Node",
         key: Any,
         parse_tree: OmegaConfGrammarParser.ConfigValueContext,
@@ -568,6 +570,7 @@ class Container(Box):
     def _validate_and_convert_interpolation_result(
         self,
         parent: Optional["Container"],
+        # TODO: do we need to generalize this from `Container` to `Box`?
         value: "Node",
         key: Any,
         resolved: Any,
@@ -603,6 +606,8 @@ class Container(Box):
                 resolved = conv_value
 
         if must_wrap:
+            # TODO: Can we get rid of needing to pass parent here?
+            # return InterpolationResultNode(value=resolved, key=key)
             return InterpolationResultNode(value=resolved, key=key, parent=parent)
         else:
             assert isinstance(resolved, Node)
@@ -674,6 +679,7 @@ class Container(Box):
     def _maybe_resolve_interpolation(
         self,
         parent: Optional["Container"],
+        # TODO: do we need to generalize this from `Container` to `Box`?
         key: Any,
         value: Node,
         throw_on_resolution_failure: bool,
@@ -745,6 +751,7 @@ class Container(Box):
         # update parents of first level Config nodes to self
 
         if isinstance(self, Container):
+            # TODO: do we need to generalize this from `Container` to `Box`?
             if isinstance(self, DictConfig):
                 content = self.__dict__["_content"]
                 if isinstance(content, dict):
@@ -752,6 +759,7 @@ class Container(Box):
                         if value is not None:
                             value._set_parent(self)
                         if isinstance(value, Container):
+                            # TODO: do we need to generalize this from `Container` to `Box`?
                             value._re_parent()
             elif isinstance(self, ListConfig):
                 content = self.__dict__["_content"]
@@ -760,6 +768,7 @@ class Container(Box):
                         if item is not None:
                             item._set_parent(self)
                         if isinstance(item, Container):
+                            # TODO: do we need to generalize this from `Container` to `Box`?
                             item._re_parent()
 
     def _invalidate_flags_cache(self) -> None:
@@ -820,10 +829,10 @@ class UnionNode(Box):
                 parent=parent,
                 metadata=Metadata(
                     ref_type=ref_type,
-                    object_type=object,
+                    object_type=object,  # TODO: compute and update object type?
                     optional=is_optional,
                     key=key,
-                    flags=None,
+                    flags=None,  # TODO: how to handle flags?
                 ),
             )
             self._set_value(content)
@@ -875,6 +884,7 @@ class UnionNode(Box):
     ) -> None:
         from omegaconf.omegaconf import _node_wrap
 
+        # TODO: what to do with flags?
         ref_type = self._metadata.ref_type
 
         if _is_special(value):
@@ -888,6 +898,7 @@ class UnionNode(Box):
             self.__dict__["_content"] = value
         elif isinstance(value, Node):
             assert False
+            # TODO: handle this case. Would this come up during merge?
         else:
             for candidate_ref_type in ref_type.__args__:
                 try:
@@ -895,7 +906,7 @@ class UnionNode(Box):
                         value=value,
                         ref_type=candidate_ref_type,
                         is_optional=False,
-                        key=None,
+                        key=None,  # TODO; Should we use key=key here?
                         parent=self,
                     )
                     break

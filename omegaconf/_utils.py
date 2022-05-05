@@ -821,7 +821,9 @@ def format_and_raise(
         ref_type = None
         ref_type_str = None
     else:
+        # Question: Why do we need to check `node._is_none()` here?
         if key is not None and not node._is_none():
+            # This should be _get_node instead of _get_child. Write a test to prove it!
             child_node = node._get_node(key, validate_access=False)
 
         try:

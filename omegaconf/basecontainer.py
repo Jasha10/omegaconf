@@ -252,6 +252,7 @@ class BaseContainer(Container, ABC):
                     enum_to_str=enum_to_str,
                     structured_config_mode=structured_config_mode,
                 )
+                # TODO: handle Box and/or UnionNode cases?
             else:
                 value = convert(node)
             return value
@@ -275,6 +276,7 @@ class BaseContainer(Container, ABC):
         if resolve:
             _conf = conf._dereference_node()
             assert isinstance(_conf, Container)
+            # TODO: I don't think we need to handle Box case here...
             conf = _conf
 
         if isinstance(conf, DictConfig):
@@ -307,6 +309,7 @@ class BaseContainer(Container, ABC):
     @staticmethod
     def _map_merge(dest: "BaseContainer", src: "BaseContainer") -> None:
         """merge src into dest and return a new copy, does not modified input"""
+        # TODO: can we avoid having to generalize this to Box?
         from omegaconf import AnyNode, DictConfig, ValueNode
 
         assert isinstance(dest, DictConfig)
@@ -358,7 +361,9 @@ class BaseContainer(Container, ABC):
 
         src_items = src.items_ex(resolve=False) if not src._is_missing() else []
         for key, src_value in src_items:
+            # TODO: should this call to _get_child be replaced with _get_node?
             src_node = src._get_child(key, validate_access=False)
+            # TODO: should this call to _get_child be replaced with _get_node?
             dest_node = dest._get_child(key, validate_access=False)
             assert src_node is None or isinstance(src_node, Node)
             assert dest_node is None or isinstance(dest_node, Node)
@@ -380,6 +385,7 @@ class BaseContainer(Container, ABC):
                 target_node = dest_node._maybe_dereference_node()
                 if isinstance(target_node, Container):
                     dest[key] = target_node
+                    # TODO: should this call to _get_child be replaced with _get_node?
                     dest_node = dest._get_child(key)
 
             is_optional, et = _resolve_optional(dest._metadata.element_type)
@@ -388,6 +394,7 @@ class BaseContainer(Container, ABC):
                 dest[key] = DictConfig(
                     et, parent=dest, ref_type=et, is_optional=is_optional
                 )
+                # TODO: should this call to _get_child be replaced with _get_node?
                 dest_node = dest._get_child(key)
 
             if dest_node is not None:
@@ -426,8 +433,10 @@ class BaseContainer(Container, ABC):
                 if is_structured_config(src_type):
                     # verified to be compatible above in _validate_merge
                     with open_dict(dest):
+                        # TODO: should this call to _get_child be replaced with _get_node?
                         dest[key] = src._get_child(key)
                 else:
+                    # TODO: should this call to _get_child be replaced with _get_node?
                     dest[key] = src._get_child(key)
 
         _update_types(node=dest, ref_type=src_ref_type, object_type=src_type)
@@ -485,6 +494,10 @@ class BaseContainer(Container, ABC):
             "BaseContainer", Dict[str, Any], List[Any], Tuple[Any, ...], Any
         ],
     ) -> None:
+        # TODO: do we need to generalize this to Box? I think so.
+        # To handle merging with self of type UnionNode, we'll need to create a deepcopy
+        # of _content then, for each candidate ref_type in the union, try merging and
+        # then back out a validation error occurs.
         try:
             self._merge_with(*others)
         except Exception as e:
@@ -551,6 +564,7 @@ class BaseContainer(Container, ABC):
             raise ReadonlyConfigError("Cannot change read-only config container")
 
         input_is_node = isinstance(value, Node)
+        # TODO: should this call to _get_child be replaced with _get_node?
         target_node_ref = self._get_child(key)
 
         input_is_typed_vnode = isinstance(value, ValueNode) and not isinstance(
@@ -562,6 +576,7 @@ class BaseContainer(Container, ABC):
             if not is_structured_config(val):
                 type_hint = self._metadata.element_type
             else:
+                # TODO: should this call to _get_child be replaced with _get_node?
                 target = self._get_child(key)
                 if target is None:
                     type_hint = self._metadata.element_type
@@ -607,6 +622,7 @@ class BaseContainer(Container, ABC):
                 self.__dict__["_content"][key]._set_value(value)
             elif input_is_node:
                 _, ref_type = _resolve_optional(type_hint)
+                # TODO: do we need `or is_union_annotation(ref_type)` here?:
                 if special_value and (
                     is_container_annotation(ref_type) or is_structured_config(ref_type)
                 ):
@@ -637,7 +653,9 @@ class BaseContainer(Container, ABC):
         c2: Container,
         k2: Union[DictKeyType, int],
     ) -> bool:
+        # TODO: should this call to _get_child be replaced with _get_node?
         v1 = c1._get_child(k1)
+        # TODO: should this call to _get_child be replaced with _get_node?
         v2 = c2._get_child(k2)
         assert v1 is not None and v2 is not None
 
@@ -766,6 +784,9 @@ class BaseContainer(Container, ABC):
                 full_key = prepand("", type(cur._get_parent()), type(cur), cur._key())
         else:
             cur = self
+            # TODO: Once Containers are allowed to be nested inside UnionNode, we'll
+            # probably have to change the following if block to check whether
+            # self._parent is None instead checking whether self._key() is None.
             if cur._key() is None:
                 return ""
             full_key = self._key()
@@ -850,12 +871,14 @@ def _deep_update_type_hint(node: Node, type_hint: Any) -> None:
 
 def _deep_update_subnode(node: BaseContainer, key: Any, value_type_hint: Any) -> None:
     """Get node[key] and ensure it is compatible with value_type_hint, mutating if necessary."""
+    # TODO: should this call to _get_child be replaced with _get_node?
     subnode = node._get_child(key)
     assert isinstance(subnode, Node)
     if _is_special(subnode):
         # Ensure special values are wrapped in a Node subclass that
         # is compatible with the type hint.
         node._wrap_value_and_set(key, subnode._value(), value_type_hint)
+        # TODO: should this call to _get_child be replaced with _get_node?
         subnode = node._get_child(key)
         assert isinstance(subnode, Node)
     _deep_update_type_hint(subnode, value_type_hint)

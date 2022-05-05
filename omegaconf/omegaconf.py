@@ -761,6 +761,8 @@ class OmegaConf:
         with ctx:
             if merge and (OmegaConf.is_config(value) or is_primitive_container(value)):
                 assert isinstance(root, BaseContainer)
+                # TODO: this should be _get_node, as merge_with should be called on the
+                # UnionNode. Write a test case to prove it!
                 node = root._get_node(last_key)
                 if OmegaConf.is_config(node):
                     assert isinstance(node, BaseContainer)
@@ -1133,6 +1135,7 @@ def _select_one(
 
     if isinstance(c, DictConfig):
         assert isinstance(ret_key, str)
+        # TODO: Should this be _get_node?
         val = c._get_child(ret_key, validate_access=False)
     elif isinstance(c, ListConfig):
         assert isinstance(ret_key, str)
@@ -1148,6 +1151,7 @@ def _select_one(
             if ret_key < 0 or ret_key + 1 > len(c):
                 val = None
             else:
+                # TODO: Should this be _get_node?
                 val = c._get_child(ret_key)
     else:
         assert False

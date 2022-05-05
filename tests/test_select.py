@@ -295,6 +295,7 @@ inp: Any = {"a": {"b": {"c": 10}}, "z": 10}
 
 
 class TestSelectFromNestedNode:
+    # TODO: add test cases involving UnionNode
     @mark.parametrize(
         ("key", "expected"),
         [

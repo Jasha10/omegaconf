@@ -70,6 +70,9 @@ class NotOptionalA:
     x: A = None  # type: ignore
 
 
+# TODO: test full key calculation when UnionNodes are involved
+
+
 @dataclass
 class Expected:
     exception_type: Type[Exception]

@@ -196,6 +196,7 @@ def test_resolve_key_and_root(
     cfg = _ensure_container(cfg)
     node: Container = OmegaConf.select(cfg, node_key)
     assert node._resolve_key_and_root(key) == expected
+    # TODO: definitely add test cases here for Unions
 
 
 @mark.parametrize("copy_func", [copy.copy, copy.deepcopy])

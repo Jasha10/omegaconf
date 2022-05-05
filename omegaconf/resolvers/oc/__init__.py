@@ -39,6 +39,9 @@ def env(key: str, default: Any = _DEFAULT_MARKER_) -> Optional[str]:
 
 
 def decode(expr: Optional[str], _parent_: Container, _node_: Node) -> Any:
+    # TODO: make sure the _parent_ passed to interpolations is the right thing!
+    # To not break the public `_parent_` API, it should be a Container (and not
+    # a UnionNode).
     """
     Parse and evaluate `expr` according to the `singleElement` rule of the grammar.
 
