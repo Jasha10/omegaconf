@@ -25,6 +25,7 @@ from tests import (
     SubscriptedDictOpt,
     SubscriptedList,
     SubscriptedListOpt,
+    UnionAnnotations,
     UntypedDict,
     UntypedList,
 )
@@ -354,6 +355,19 @@ def test_pickle_untyped(
         assert get_node(cfg2, node)._metadata.optional == optional
         if isinstance(input_, DictConfig):
             assert get_node(cfg2, node)._metadata.key_type == key_type
+
+
+@mark.parametrize("key", ["ubf", "oubf"])
+def test_pickle_union_node(key: str) -> None:
+    cfg = OmegaConf.structured(UnionAnnotations)
+    pickled = pickle.dumps(cfg)
+    cfg2 = pickle.loads(pickled)
+    node = cfg._get_node(key)
+    node2 = cfg2._get_node(key)
+
+    assert cfg == cfg2
+    assert node._metadata == node2._metadata
+    assert node2._parent == cfg2
 
 
 def test_pickle_missing() -> None:
