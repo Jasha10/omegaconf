@@ -32,14 +32,16 @@ in the input class.
 Currently, type hints supported in OmegaConf’s structured configs include:
  - primitive types (``int``, ``float``, ``bool``, ``str``, ``Path``) and enum types
    (user-defined subclasses of ``enum.Enum``). See the :ref:`simple_types` section below.
+ - unions of primitive/enum types, e.g. ``Union[float, bool, MyEnum]``.
+   See :ref:`union_types` below.
  - structured config fields (i.e. MyConfig.x can have type hint MySubConfig).
    See the :ref:`nesting_structured_configs` section below.
- - optional types (any of the above can be wrapped in a ``typing.Optional[...]``
-   annotation). See :ref:`other_special_features` below.
  - dict and list types: ``typing.Dict[K, V]`` or ``typing.List[V]``, where K is
    primitive or enum, and where V is any of the above (including nested dicts
    or lists, e.g. ``Dict[str, List[int]]``).
    See the :ref:`lists` and :ref:`dictionaries` sections below.
+ - optional types (any of the above can be wrapped in a ``typing.Optional[...]``
+   annotation). See :ref:`other_special_features` below.
 
 .. _simple_types:
 
@@ -333,6 +335,71 @@ Dict and List annotations can be nested flexibly:
     <BLANKLINE>
     >>> with raises(ValidationError):
     ...     cfg.list_of_dict = [["whoops"]]  # not a list of dicts
+
+.. _union_types:
+
+Unions
+^^^^^^
+
+You can use `typing.Union <https://docs.python.org/3/library/typing.html#typing.Union>`_
+to annotate unions of simple types (see :ref:`simple_types` above). 
+
+.. doctest::
+
+    >>> from typing import Union
+    >>>
+    >>> @dataclass
+    ... class HasUnion:
+    ...     u: Union[float, bool] = 10.1
+    ...
+    >>> cfg = OmegaConf.structured(HasUnion)
+    >>> assert cfg.u == 10.1
+    >>> cfg.u = True  # ok
+    >>> cfg.u = b"binary"  # bytes not compatible with union
+    Traceback (most recent call last):
+    ...
+    omegaconf.errors.ValidationError: Cannot assign 'b'binary'' of type 'bytes' to Union[float, bool]
+        full_key: u
+        object_type=HasUnion
+    >>> OmegaConf.structured(HasUnion("abc"))  # str not compatible
+    Traceback (most recent call last):
+    ...
+    omegaconf.errors.ValidationError: Cannot assign 'abc' of type 'str' to Union[float, bool]
+        full_key: u
+        object_type=None
+
+When using ``Union`` type hints, carefully consider the order of arguments in
+your union. Assigned values will be converted to the leftmost compatible type
+appearing in the union annotation. In the following example, the difference
+between ``Union[str, int]`` and ``Union[int, str]`` is significant:
+
+.. doctest::
+
+    >>> @dataclass
+    ... class StrOrInt:
+    ...     u: Union[str, int]
+    ...
+    >>> @dataclass
+    ... class IntOrStr:
+    ...     u: Union[int, str]
+    ...
+    >>> cfg = OmegaConf.structured(StrOrInt)
+    >>> cfg.u = 123
+    >>> cfg.u  # The assigned value has been converted to a string!
+    '123'
+    >>> cfg = OmegaConf.structured(IntOrStr)
+    >>> cfg.u = 123
+    >>> cfg.u  # The assigned value remains an integer
+    123
+
+Also note that if any argument of a ``Union`` type hint is ``Optional``, the *whole*
+union is considered optional. For example, OmegaConf treats all four of the
+following type hints as equivalent:
+ - ``Optional[Union[int, str]]``
+ - ``Union[Optional[int], str]``
+ - ``Union[int, str, None]``
+ - ``Union[int, str, type(None)]``
+
 
 .. _other_special_features:
 
