@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import copy
 import io
 import os
 import pathlib
@@ -7,12 +8,13 @@ import re
 import sys
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Type, Union
 
 from pytest import mark, param, raises
 
-from omegaconf import MISSING, DictConfig, ListConfig, OmegaConf
+from omegaconf import MISSING, DictConfig, ListConfig, Node, OmegaConf, UnionNode
 from omegaconf._utils import get_type_hint
+from omegaconf.base import Box
 from omegaconf.errors import OmegaConfBaseException
 from tests import (
     Color,
@@ -409,3 +411,29 @@ def test_python36_pickle_optional() -> None:
         ),
     ):
         pickle.dumps(cfg)
+
+
+@mark.parametrize(
+    "copy_fn",
+    [
+        param(lambda obj: copy.deepcopy(obj), id="deepcopy"),
+        param(lambda obj: copy.copy(obj), id="copy"),
+        param(lambda obj: pickle.loads(pickle.dumps(obj)), id="pickle"),
+    ],
+)
+@mark.parametrize(
+    "box, get_child",
+    [
+        param(
+            UnionNode(10.0, Union[float, bool]), lambda cfg: cfg._value(), id="union"
+        ),
+        param(DictConfig({"foo": "bar"}), lambda cfg: cfg._get_node("foo"), id="dict"),
+        param(ListConfig(["bar"]), lambda cfg: cfg._get_node(0), id="list"),
+    ],
+)
+def test_copy_preserves_parent_of_child(
+    box: Box, get_child: Callable[[Box], Node], copy_fn: Callable[[Box], Box]
+) -> None:
+    assert get_child(box)._parent is box
+    cp = copy_fn(box)
+    assert get_child(cp)._parent is cp

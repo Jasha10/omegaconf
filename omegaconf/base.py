@@ -364,6 +364,10 @@ class Box(Node):
     def _has_ref_type(self) -> bool:
         return self._metadata.ref_type is not Any
 
+    def __copy__(self) -> Any:
+        # real shallow copy is impossible because of the reference to the parent.
+        return copy.deepcopy(self)
+
 
 class Container(Box):
     """
@@ -409,10 +413,6 @@ class Container(Box):
     @abstractmethod
     def __getitem__(self, key_or_index: Any) -> Any:
         ...
-
-    def __copy__(self) -> Any:
-        # real shallow copy is impossible because of the reference to the parent.
-        return copy.deepcopy(self)
 
     def _resolve_key_and_root(self, key: str) -> Tuple["Container", str]:
         orig = key
@@ -918,3 +918,26 @@ class UnionNode(Box):
 
     def __repr__(self) -> str:
         return self.__dict__["_content"].__repr__()
+
+    def __deepcopy__(self, memo: Dict[int, Any]) -> "UnionNode":
+        res = object.__new__(type(self))
+        for key, value in self.__dict__.items():
+            if key not in ("_content", "_parent"):
+                res.__dict__[key] = copy.deepcopy(value, memo=memo)
+
+        src_content = self.__dict__["_content"]
+        if isinstance(src_content, Node):
+            old_parent = src_content.__dict__["_parent"]
+            try:
+                src_content.__dict__["_parent"] = None
+                content_copy = copy.deepcopy(src_content, memo=memo)
+                content_copy.__dict__["_parent"] = res
+            finally:
+                src_content.__dict__["_parent"] = old_parent
+        else:
+            # None and strings can be assigned as is
+            content_copy = src_content
+
+        res.__dict__["_content"] = content_copy
+        res.__dict__["_parent"] = self.__dict__["_parent"]
+        return res
