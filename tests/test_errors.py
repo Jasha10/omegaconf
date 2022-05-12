@@ -776,6 +776,18 @@ params = [
     ),
     param(
         Expected(
+            create=lambda: DictConfig({"bar": UnionNode(123.456, Union[bool, float])}),
+            op=lambda cfg: cfg.__setattr__("bar", "abc"),
+            exception_type=ValidationError,
+            msg="Cannot assign 'abc' of type 'str' to Optional[Union[bool, float]]",
+            key="bar",
+            full_key="bar",
+            child_node=lambda cfg: cfg._get_node("bar"),
+        ),
+        id="typed_DictConfig:assign_with_invalid_value-string_to_union[bool-float]",
+    ),
+    param(
+        Expected(
             create=lambda: None,
             op=lambda cfg: OmegaConf.structured(IllegalType()),
             exception_type=ValidationError,

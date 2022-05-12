@@ -714,13 +714,23 @@ class BaseContainer(Container, ABC):
             else:
                 return f"{x.start}:{x.stop}"
 
-        def prepand(full_key: str, parent_type: Any, cur_type: Any, key: Any) -> str:
+        def prepand(
+            full_key: str,
+            parent_type: Any,
+            cur_type: Any,
+            key: Optional[Union[DictKeyType, int, slice]],
+        ) -> str:
+            if key is None:
+                return full_key
+
             if isinstance(key, slice):
                 key = _slice_to_str(key)
             elif isinstance(key, Enum):
                 key = key.name
-            elif isinstance(key, (int, float, bool)):
+            else:
                 key = str(key)
+
+            assert isinstance(key, str)
 
             if issubclass(parent_type, ListConfig):
                 if full_key != "":

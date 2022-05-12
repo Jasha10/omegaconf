@@ -1,8 +1,8 @@
-from typing import Any
+from typing import Any, Union
 
 from pytest import mark, param
 
-from omegaconf import DictConfig, IntegerNode, OmegaConf
+from omegaconf import DictConfig, IntegerNode, OmegaConf, UnionNode
 from tests import Color
 
 
@@ -92,6 +92,11 @@ from tests import Color
         # slice
         ([1, 2, 3], "", slice(0, 1), "[0:1]"),
         ([1, 2, 3], "", slice(0, 1, 2), "[0:1:2]"),
+        # union
+        ({"foo": UnionNode(123, Union[int, str])}, "", "foo", "foo"),
+        ([UnionNode(123, Union[int, str])], "", "0", "[0]"),
+        ({"foo": {"bar": UnionNode(123, Union[int, str])}}, "foo", "bar", "foo.bar"),
+        ({"foo": {"bar": UnionNode(123, Union[int, str])}}, "foo.bar", None, "foo.bar"),
     ],
 )
 def test_get_full_key_from_config(
