@@ -1,7 +1,7 @@
 import pathlib
 import platform
 from pathlib import Path
-from typing import Any, Union
+from typing import Any, Dict, List, Union
 
 from pytest import mark, param, raises
 
@@ -387,6 +387,8 @@ def test_is_interpolation(fac: Any) -> Any:
         ({"foo": b"123"}, bytes),
         ({"foo": UnionNode(10.0, Union[float, bytes])}, float),
         ({"foo": UnionNode(None, Union[float, bytes])}, type(None)),
+        ({"foo": UnionNode({}, Union[float, bytes, Dict[str, str]])}, dict),
+        ({"foo": UnionNode([], Union[float, bytes, List[str]])}, list),
         ({"foo": FloatNode(10.0)}, float),
         ({"foo": FloatNode(None)}, type(None)),
         (

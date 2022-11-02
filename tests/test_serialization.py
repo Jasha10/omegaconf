@@ -440,7 +440,7 @@ def test_python36_pickle_optional() -> None:
     "box, get_child",
     [
         param(
-            UnionNode(10.0, Union[float, bool]),
+            UnionNode(10.0, Union[float, bool, Dict[str, str], List[str]]),
             lambda cfg: cfg._value(),
             marks=mark.skipif(
                 sys.version_info < (3, 7), reason="requires python3.7 or newer"

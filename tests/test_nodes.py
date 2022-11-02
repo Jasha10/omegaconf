@@ -5,7 +5,7 @@ import sys
 from enum import Enum
 from functools import partial
 from pathlib import Path
-from typing import Any, Callable, Dict, Tuple, Type, Union
+from typing import Any, Callable, Dict, List, Tuple, Type, Union
 
 from pytest import fixture, mark, param, raises
 
@@ -36,7 +36,10 @@ from tests import Color, Enum1, IllegalType, User
 
 
 def _build_union(content: Any) -> UnionNode:
-    return UnionNode(content=content, ref_type=Union[(Enum, *BUILTIN_VALUE_TYPES)])
+    return UnionNode(
+        content=content,
+        ref_type=Union[(Enum, *BUILTIN_VALUE_TYPES, Dict[Any, Any], List[Any])],
+    )
 
 
 # testing valid conversions
@@ -113,6 +116,8 @@ def _build_union(content: Any) -> UnionNode:
         ),
         param(_build_union, None, None, id="union-none"),
         param(_build_union, Color.RED, Color.RED, id="union-enum"),
+        param(_build_union, {"a": "b"}, {"a": "b"}, id="union-dict"),
+        param(_build_union, ["a"], ["a"], id="union-list"),
     ],
 )
 def test_valid_inputs(type_: type, input_: Any, output_: Any) -> None:

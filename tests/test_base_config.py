@@ -513,6 +513,12 @@ class TestParentAfterCopy:
         assert nc._get_parent() is cfg
         assert nc._value()._get_parent() is nc
 
+    def test_union_container_copy(self, copy_func: Any) -> None:
+        cfg = OmegaConf.create({"a": UnionNode([], Union[float, bool, List[str]])})
+        nc = copy_func(cfg._get_node("a"))
+        assert nc._get_parent() is cfg
+        assert nc._value()._get_parent() is nc
+
 
 def test_omegaconf_init_not_implemented() -> None:
     with raises(NotImplementedError):
